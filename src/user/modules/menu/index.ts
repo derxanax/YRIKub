@@ -1,15 +1,15 @@
 import { Module } from "@/user/types";
+import fs from "fs";
 import path from "path";
 import ping from "ping";
 import si from "systeminformation";
 import { TelegramClient } from "telegram";
+import { CustomFile } from "telegram/client/uploads";
 import { NewMessageEvent } from "telegram/events";
 import info from "./info.json";
 
 async function menuHandler(client: TelegramClient, event: NewMessageEvent): Promise<void> {
   const message = event.message;
-
-  await message.edit({ text: "✨ Собираю данные..." });
 
   try {
     const cpu = await si.cpu();
@@ -46,23 +46,30 @@ async function menuHandler(client: TelegramClient, event: NewMessageEvent): Prom
       `╰───﹝ @derxanax ﹞───`
     ].join('\n');
 
-    await client.deleteMessages(message.chatId!, [message.id], { revoke: true });
+    // Создаем CustomFile из файла на диске
+    const fileBuffer = fs.readFileSync(logoPath);
+    const customFile = new CustomFile("logo.png", fileBuffer.length, "", fileBuffer);
 
-    await client.sendFile(message.chatId!, {
-      file: logoPath,
-      caption: responseText
+    // Загружаем файл для отправки
+    const inputFile = await client.uploadFile({
+      file: customFile,
+      workers: 1
     });
 
+    // Используем sendMessage с файлом вместо editMessage
+    await client.sendMessage(message.chatId!, {
+      file: inputFile,
+      message: responseText,
+      replyTo: message.id
+    });
+
+    // Удаляем исходное сообщение после отправки нового
+    await client.deleteMessages(message.chatId!, [message.id], { revoke: true });
+
   } catch (e: any) {
-    console.error("Failed to generate menu:", e);
     try {
-      await client.editMessage(message.chatId!, {
-        message: message.id,
-        text: `❌ Произошла ошибка: ${e.message || String(e)}`
-      });
-    } catch (editError) {
-      console.error("Failed to edit message with error:", editError);
-    }
+      await message.edit({ text: `❌ Ошибка: ${e.message || String(e)}` });
+    } catch { }
   }
 }
 

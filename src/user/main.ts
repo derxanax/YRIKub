@@ -17,7 +17,10 @@ if (!apiId || !apiHash) {
 }
 
 const client = new TelegramClient(session, apiId, apiHash, {
-  connectionRetries: 5,
+  connectionRetries: 10,
+  retryDelay: 1000,
+  useWSS: false,
+  floodSleepThreshold: 60,
 });
 
 const commandPrefix = ".";
@@ -35,10 +38,7 @@ export async function loadModules() {
 
       try {
         const info: ModuleInfo = JSON.parse(await fs.readFile(infoPath, 'utf-8'));
-        if (!info.enabled) {
-          console.log(`[Module] Skipping disabled module: ${info.name}`);
-          continue;
-        }
+        if (!info.enabled) continue;
 
         const moduleImport = require(path.resolve(moduleIndexPath.replace(/\.js$/, '')));
         const module: Module = Object.values(moduleImport)[0] as Module;
@@ -47,13 +47,15 @@ export async function loadModules() {
           for (const command of module.commands) {
             loadedModules.set(command.toLowerCase(), module);
           }
-          console.log(`[Module] Loaded module '${module.info.name}' for commands: ${module.commands.join(', ')}`);
+          console.log(`Загружен модуль: ${info.name} (${module.commands.join(', ')})`);
         }
       } catch (error) {
-        console.error(`[Module] Failed to load module from ${dir.name}:`, error);
+        console.error(`Ошибка загрузки модуля ${dir.name}:`, error);
       }
     }
   }
+
+  console.log(`Всего загружено модулей: ${loadedModules.size}`);
 }
 
 async function handleNewMessage(event: NewMessageEvent) {
@@ -66,30 +68,38 @@ async function handleNewMessage(event: NewMessageEvent) {
   const module = loadedModules.get(commandName.toLowerCase());
 
   if (module) {
+    console.log(`Выполняется команда: ${commandName}`);
     try {
-      console.log(`[Command] Executing command '${commandName}' from module '${module.info.name}'`);
       await module.handler(client, event, args);
     } catch (error: any) {
-      console.error(`[Command] Error executing command '${commandName}':`, error);
+      console.error(`Ошибка ${commandName}: ${error.message || String(error)}`);
       try {
         await event.message.edit({
           text: `❌ Ошибка: ${error.message || String(error)}`
         });
       } catch (e) {
+        console.error("Не удалось отредактировать сообщение с ошибкой:", e);
       }
     }
   }
 }
 
 export async function startUserBot() {
-  console.log("[UserBot] Starting...");
+  console.log("Подключение к Telegram...");
+  try {
+    await client.connect();
+    console.log("Успешное подключение к Telegram");
 
-  await client.connect();
+    await loadModules();
+    console.log("Модули загружены успешно");
 
-  console.log("[UserBot] You should now be connected.");
+    client.addEventHandler(handleNewMessage, new NewMessage({ incoming: false }));
+    console.log("UserBot запущен и готов к работе");
 
-  await loadModules();
-  console.log(`[UserBot] ${loadedModules.size} commands loaded.`);
-
-  client.addEventHandler(handleNewMessage, new NewMessage({ incoming: false }));
+    const me = await client.getMe();
+    console.log(`Авторизован как: ${(me as any).firstName} (@${(me as any).username || 'без юзернейма'})`);
+  } catch (error) {
+    console.error("Ошибка запуска UserBot:", error);
+    throw error;
+  }
 }

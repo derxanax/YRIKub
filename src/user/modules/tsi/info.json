@@ -1,0 +1,7 @@
+{
+  "name": "test-inline",
+  "version": "1.0.0",
+  "description": "Запускает инлайн-бота с тестовой кнопкой.",
+  "author": "derxanax",
+  "enabled": true
+}

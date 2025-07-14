@@ -10,20 +10,16 @@ async function main() {
     const logo = await fs.readFile(logoPath, 'utf-8');
     console.log(chalk.magentaBright(logo));
   } catch (error) {
-    console.log(chalk.red("Could not load ASCII logo."));
   }
 
-  console.log(chalk.blue("Starting services..."));
-
-  await Promise.all([
-    startUserBot(),
-    startBotPlaceholder()
-  ]).catch(error => {
-    console.error(chalk.red("An error occurred during startup:"), error);
+  try {
+    // Запускаем боты последовательно, а не параллельно
+    await startUserBot();
+    await startBotPlaceholder();
+  } catch (error) {
+    console.error(chalk.red("Ошибка запуска:"), error);
     process.exit(1);
-  });
-
-  console.log(chalk.green("All services are running."));
+  }
 }
 
 main();
