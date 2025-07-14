@@ -1,0 +1,37 @@
+{
+  "name": "yrikub",
+  "version": "0.0.1",
+  "description": "the telegram TS(js) based UserBOt",
+  "main": "src/main.ts",
+  "scripts": {
+    "start": "ts-node -r tsconfig-paths/register src/main.ts",
+    "dev": "nodemon",
+    "build": "tsc"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/derxanax/YRIKub.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/derxanax/YRIKub/issues"
+  },
+  "homepage": "https://github.com/derxanax/YRIKub#readme",
+  "keywords": [],
+  "dependencies": {
+    "dotenv": "^17.2.0",
+    "ping": "^0.4.4",
+    "systeminformation": "^5.27.7",
+    "telegram": "^2.26.22"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.13",
+    "@types/ping": "^0.4.4",
+    "chalk": "^5.4.1",
+    "nodemon": "^3.1.10",
+    "ts-node": "^10.9.2",
+    "tsconfig-paths": "^4.2.0",
+    "typescript": "^5.8.3"
+  }
+}

@@ -1,0 +1,7 @@
+{
+  "name": "module-manager",
+  "version": "1.0.0",
+  "description": "Управляет другими модулями (вкл/выкл, список).",
+  "author": "derxanax",
+  "enabled": true
+}
