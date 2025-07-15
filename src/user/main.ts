@@ -58,6 +58,34 @@ export async function loadModules() {
   console.log(`Всего загружено модулей: ${loadedModules.size}`);
 }
 
+async function updateAdminId(userId: string) {
+  try {
+    // Путь к файлу info.json модуля inline-buttons
+    const inlineButtonsInfoPath = path.join(__dirname, '..', 'bot', 'modules', 'inline-buttons', 'info.json');
+
+    // Проверяем существование файла
+    try {
+      await fs.access(inlineButtonsInfoPath);
+    } catch {
+      console.log(`Файл ${inlineButtonsInfoPath} не найден`);
+      return;
+    }
+
+    // Читаем содержимое файла
+    const infoContent = await fs.readFile(inlineButtonsInfoPath, 'utf-8');
+    const info = JSON.parse(infoContent);
+
+    // Обновляем id-admin
+    info['id-admin'] = userId;
+
+    // Записываем обратно в файл
+    await fs.writeFile(inlineButtonsInfoPath, JSON.stringify(info, null, 2));
+    console.log(`ID админа обновлен: ${userId}`);
+  } catch (error) {
+    console.error(`Ошибка обновления ID админа:`, error);
+  }
+}
+
 async function handleNewMessage(event: NewMessageEvent) {
   const message = event.message;
   if (!message.out || !message.text || !message.text.startsWith(commandPrefix)) {
@@ -90,13 +118,19 @@ export async function startUserBot() {
     await client.connect();
     console.log("Успешное подключение к Telegram");
 
+    // Получаем информацию о текущем пользователе
+    const me = await client.getMe();
+    const userId = (me as any).id.toString();
+
+    // Обновляем ID админа в файле info.json
+    await updateAdminId(userId);
+
     await loadModules();
     console.log("Модули загружены успешно");
 
     client.addEventHandler(handleNewMessage, new NewMessage({ incoming: false }));
     console.log("UserBot запущен и готов к работе");
 
-    const me = await client.getMe();
     console.log(`Авторизован как: ${(me as any).firstName} (@${(me as any).username || 'без юзернейма'})`);
   } catch (error) {
     console.error("Ошибка запуска UserBot:", error);

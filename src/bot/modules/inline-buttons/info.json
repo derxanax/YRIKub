@@ -3,5 +3,6 @@
   "version": "1.0.0",
   "description": "Модуль для работы с инлайн-кнопками и случайными мудростями",
   "author": "derxanax",
-  "enabled": true
+  "enabled": true,
+  "id-admin": "7894754476"
 }

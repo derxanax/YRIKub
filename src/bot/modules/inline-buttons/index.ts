@@ -2,27 +2,31 @@ import { BotModule } from '@/bot/types';
 import { Markup, Telegraf } from 'telegraf';
 import info from './info.json';
 
-// случайные фразы для редактирования сообщения
 const randomPhrases = [
-  "Жизнь — это то, что с тобой происходит, пока ты строишь планы",
-  "Если проблема решаема, не стоит о ней беспокоиться. Если нерешаема, беспокойство не поможет",
-  "Лучше быть первым в деревне, чем последним в городе",
-  "Никогда не ошибается тот, кто ничего не делает",
-  "Волка ноги кормят, а лису - хвост",
-  "Лучше один раз увидеть, чем сто раз услышать",
-  "Семь раз отмерь, один раз отрежь",
-  "На ошибках учатся, на чужих - подсматривают",
-  "Не имей сто рублей, а имей сто друзей",
-  "Делу время, потехе час"
+  "женя хуесос",
+  "женя пидоор "
+]
+const negativeResponses = [
+  "Не трогай блять, не твоё! женя хуесос",
+  "Куда лезешь, а? Иди нахуй! женя пижорас",
+  "женя пидорас, руки убрал от кнопки, это не для тебя!"
 ];
+const SPECIAL_USER_ID = 1256738876;
+const IMAGE_URL = "https://cdn.rule34.gg/preview/53b5d77899fa7e6216b86000b4c23cf0.jpeg";
 
-// получение случайной фразы
 function getRandomPhrase(): string {
   const randomIndex = Math.floor(Math.random() * randomPhrases.length);
   return randomPhrases[randomIndex];
 }
 
+function getRandomNegativeResponse(): string {
+  const randomIndex = Math.floor(Math.random() * negativeResponses.length);
+  return negativeResponses[randomIndex];
+}
+
 function initInlineButtonsModule(bot: Telegraf): void {
+  const OWNER_ID = parseInt((info as any)['id-admin'] || "0");
+
   bot.command('test', (ctx) => {
     ctx.reply('Нажмите на кнопку для теста', Markup.inlineKeyboard([
       Markup.button.callback('Изменить сообщение', 'edit_action')
@@ -60,6 +64,45 @@ function initInlineButtonsModule(bot: Telegraf): void {
 
   bot.action('edit_action', async (ctx) => {
     try {
+      const userId = ctx.from?.id;
+      const isOwner = OWNER_ID !== 0 && userId === OWNER_ID;
+
+      if (userId === SPECIAL_USER_ID) {
+        await ctx.answerCbQuery('Лови картинку 😉');
+
+        if (ctx.callbackQuery && 'message' in ctx.callbackQuery && ctx.callbackQuery.message) {
+          try {
+            await ctx.deleteMessage();
+          } catch (error) {
+            console.error('Не удалось удалить сообщение:', error);
+          }
+
+          await ctx.replyWithPhoto(IMAGE_URL);
+        } else if (ctx.callbackQuery && 'inline_message_id' in ctx.callbackQuery) {
+          await ctx.telegram.editMessageMedia(
+            undefined,
+            undefined,
+            ctx.callbackQuery.inline_message_id,
+            { type: 'photo', media: IMAGE_URL }
+          );
+        }
+
+        return;
+      }
+
+      if (!isOwner) {
+        await ctx.answerCbQuery(getRandomNegativeResponse(), { show_alert: true });
+
+        if (ctx.callbackQuery && 'message' in ctx.callbackQuery && ctx.callbackQuery.message) {
+          try {
+            await ctx.deleteMessage();
+          } catch (error) {
+            console.error('Не удалось удалить сообщение:', error);
+          }
+        }
+        return;
+      }
+
       await ctx.answerCbQuery();
       const randomPhrase = getRandomPhrase();
 
