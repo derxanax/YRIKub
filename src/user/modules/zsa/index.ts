@@ -271,8 +271,121 @@ async function generateDemotivator(
   const imgX = frameSize + (imageWidth - scaledWidth) / 2;
   const imgY = frameSize + (imageHeight - scaledHeight) / 2;
   
-  // Рисуем основное изображение
-  ctx.drawImage(mainImage, imgX, imgY, scaledWidth, scaledHeight);
+  // Рисуем основное изображение с эффектом
+  ctx.save();
+  
+  // Случайный эффект для основного изображения
+  const mainImageEffect = Math.floor(Math.random() * 5);
+  switch (mainImageEffect) {
+    case 0: // Нормальное изображение
+      ctx.drawImage(mainImage, imgX, imgY, scaledWidth, scaledHeight);
+      break;
+    case 1: // Черно-белое
+      ctx.filter = 'grayscale(100%)';
+      ctx.drawImage(mainImage, imgX, imgY, scaledWidth, scaledHeight);
+      break;
+    case 2: // Сепия
+      ctx.filter = 'sepia(80%)';
+      ctx.drawImage(mainImage, imgX, imgY, scaledWidth, scaledHeight);
+      break;
+    case 3: // Инвертированное
+      ctx.filter = 'invert(100%)';
+      ctx.drawImage(mainImage, imgX, imgY, scaledWidth, scaledHeight);
+      break;
+    case 4: // Размытое
+      ctx.filter = 'blur(3px)';
+      ctx.drawImage(mainImage, imgX, imgY, scaledWidth, scaledHeight);
+      break;
+  }
+  ctx.restore();
+
+  // Добавляем случайные фотографии пользователей поверх основного изображения
+  if (photos.length > 0) {
+    const maxPhotosToShow = Math.min(photos.length, 3);
+    for (let i = 0; i < maxPhotosToShow; i++) {
+      const photo = photos[i];
+      try {
+        const photoImage = await loadImage(photo.buffer);
+        
+        // Размещаем фото в случайном месте на основном изображении
+        const photoSize = 120;
+        const photoX = frameSize + Math.random() * (imageWidth - photoSize);
+        const photoY = frameSize + Math.random() * (imageHeight - photoSize);
+        
+        // Добавляем рамку для фото
+        ctx.strokeStyle = 'white';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(photoX, photoY, photoSize, photoSize);
+        
+        // Рисуем фото с эффектом
+        ctx.save();
+        const angle = (Math.random() * 40 - 20) * Math.PI / 180;
+        ctx.translate(photoX + photoSize/2, photoY + photoSize/2);
+        ctx.rotate(angle);
+        
+        // Случайный эффект для фото
+        const photoEffect = Math.floor(Math.random() * 3);
+        switch (photoEffect) {
+          case 0: // Нормальное
+            ctx.drawImage(photoImage, -photoSize/2, -photoSize/2, photoSize, photoSize);
+            break;
+          case 1: // Черно-белое
+            ctx.filter = 'grayscale(100%)';
+            ctx.drawImage(photoImage, -photoSize/2, -photoSize/2, photoSize, photoSize);
+            break;
+          case 2: // Сепия
+            ctx.filter = 'sepia(80%)';
+            ctx.drawImage(photoImage, -photoSize/2, -photoSize/2, photoSize, photoSize);
+            break;
+        }
+        ctx.restore();
+      } catch (e) {
+        // Тихая обработка ошибки
+      }
+    }
+  }
+
+  // Добавляем цитаты пользователей с аватарками
+  if (texts.length > 0) {
+    const maxTextsToShow = Math.min(texts.length, 2);
+    const quoteBoxHeight = 80;
+    const quoteBoxWidth = imageWidth - 40;
+    
+    for (let i = 0; i < maxTextsToShow; i++) {
+      const textData = texts[i];
+      const userData = users[textData.senderId.toString()];
+      
+      if (userData && userData.avatar) {
+        try {
+          const avatarImage = await loadImage(userData.avatar);
+          const avatarSize = 60;
+          const quoteBoxX = frameSize + 20;
+          const quoteBoxY = frameSize + imageHeight - (quoteBoxHeight * (i + 1)) - 20;
+          
+          // Рисуем фон для цитаты
+          ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+          ctx.fillRect(quoteBoxX, quoteBoxY, quoteBoxWidth, quoteBoxHeight);
+          
+          // Рисуем аватарку
+          ctx.drawImage(avatarImage, quoteBoxX + 10, quoteBoxY + 10, avatarSize, avatarSize);
+          
+          // Имя пользователя
+          const name = (userData.firstName || "??") + (userData.lastName ? ` ${userData.lastName}` : "");
+          ctx.font = 'bold 16px "Arial"';
+          ctx.fillStyle = 'white';
+          ctx.textAlign = 'left';
+          ctx.fillText(name, quoteBoxX + avatarSize + 20, quoteBoxY + 25);
+          
+          // Текст цитаты
+          ctx.font = '14px "Arial"';
+          ctx.fillStyle = '#cccccc';
+          wrapText(ctx, `"${escape(textData.text)}"`, quoteBoxX + avatarSize + 20, quoteBoxY + 45, quoteBoxWidth - avatarSize - 30, 18);
+        } catch (e) {
+          // Тихая обработка ошибки
+        }
+      }
+    }
+  }
 
   // Добавляем текст в стиле классического демотиватора
   const bottomTextY = frameSize + imageHeight + 40;
@@ -290,6 +403,46 @@ async function generateDemotivator(
       ctx.fillStyle = '#cccccc';
       wrapText(ctx, escape(subtitleTextData.text), finalWidth / 2, bottomTextY + 80, finalWidth - 120, 36);
     }
+    
+    // Добавляем аватарку автора цитаты
+    if (titleAuthor?.avatar) {
+      try {
+        const avatarImg = await loadImage(titleAuthor.avatar);
+        const avatarSize = 60;
+        const avatarX = frameSize + 20;
+        const avatarY = bottomTextY - 15;
+        
+        // Рисуем аватарку
+        ctx.drawImage(avatarImg, avatarX, avatarY, avatarSize, avatarSize);
+        
+        // Добавляем имя автора
+        if (titleAuthor.name) {
+          ctx.font = 'italic 16px "Times New Roman"';
+          ctx.fillStyle = '#999999';
+          ctx.textAlign = 'left';
+          ctx.fillText(`— ${titleAuthor.name}`, avatarX + avatarSize + 10, avatarY + avatarSize/2);
+        }
+      } catch (e) {
+        // Тихая обработка ошибки
+      }
+    }
+  }
+
+  // Добавляем случайную "водяную метку" из сообщений чата
+  if (texts.length > 0) {
+    // Берем случайное сообщение из чата для водяной метки
+    const randomTextIndex = Math.floor(Math.random() * texts.length);
+    const randomText = texts[randomTextIndex].text;
+    
+    // Берем короткую часть сообщения (до 20 символов)
+    const shortText = randomText.length > 20 
+      ? randomText.substring(0, 20) + "..." 
+      : randomText;
+    
+    ctx.font = 'italic 14px "Arial"';
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
+    ctx.textAlign = 'right';
+    ctx.fillText(shortText, finalWidth - frameSize - 10, frameSize + 20);
   }
 
   // Возвращаем финальное изображение
