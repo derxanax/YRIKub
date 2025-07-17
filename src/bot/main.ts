@@ -16,10 +16,14 @@ export async function startBotPlaceholder(): Promise<void> {
   const bot = new Telegraf(BOT_TOKEN);
 
   await loadBotModules(bot);
+  
+  // Запускаем API-сервер для обмена данными с юзерботом
+  const { startApiServer } = await import('./api-server');
+  await startApiServer(bot);
 
   try {
     await bot.launch();
-    /* Bot launched - log removed to reduce noise */
+    console.log('Бот успешно запущен!');
   } catch (error) {
     console.error('Ошибка запуска бота:', error);
     throw error;

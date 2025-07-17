@@ -1,0 +1,7 @@
+{
+  "name": "meme",
+  "version": "1.0.0",
+  "description": "Генератор мемов из 2 случайных фото чата на мем-шаблоне",
+  "author": "kiro",
+  "enabled": true
+}

@@ -278,15 +278,29 @@ async function generateDemotivator(
   // Добавляем случайные фотографии пользователей поверх основного изображения
   if (photos.length > 0) {
     const maxPhotosToShow = Math.min(photos.length, 3);
+    const placedPhotos: { x: number, y: number, width: number, height: number }[] = [];
+    
     for (let i = 0; i < maxPhotosToShow; i++) {
       const photo = photos[i];
       try {
         const photoImage = await loadImage(photo.buffer);
         
-        // Размещаем фото в случайном месте на основном изображении
+        // Размещаем фото в случайном месте на основном изображении, избегая наложений
         const photoSize = 120;
-        const photoX = frameSize + Math.random() * (imageWidth - photoSize);
-        const photoY = frameSize + Math.random() * (imageHeight - photoSize);
+        
+        // Используем функцию findFreeSpot для поиска места без пересечений
+        const spot = findFreeSpot(photoSize, photoSize, placedPhotos, imageWidth - photoSize, imageHeight - photoSize);
+        
+        if (!spot) {
+          // Если не удалось найти свободное место, пропускаем это фото
+          continue;
+        }
+        
+        // Добавляем фото в список размещенных
+        placedPhotos.push(spot);
+        
+        const photoX = frameSize + spot.x;
+        const photoY = frameSize + spot.y;
         
         // Добавляем рамку для фото
         ctx.strokeStyle = 'white';
@@ -308,7 +322,61 @@ async function generateDemotivator(
     }
   }
 
-  // Добавляем цитаты пользователей с аватарками
+  // Добавляем аватарки пользователей слева от основного изображения
+  // Создаем вертикальную колонку с аватарками пользователей слева
+  const avatarSize = 80;
+  const avatarMargin = 10;
+  let avatarColumnX = 10; // Отступ от левого края
+  let avatarColumnY = frameSize + 20; // Начинаем с верхней части изображения
+  
+  // Собираем всех уникальных пользователей из текстов и фото
+  const uniqueUserIds = new Set<string>();
+  texts.forEach(t => {
+    if (t.senderId) uniqueUserIds.add(t.senderId.toString());
+  });
+  photos.forEach(p => {
+    if (p.senderId) uniqueUserIds.add(p.senderId.toString());
+  });
+  
+  // Отображаем аватарки пользователей слева
+  for (const userId of uniqueUserIds) {
+    const userData = users[userId];
+    if (userData && userData.avatar) {
+      try {
+        const avatarImage = await loadImage(userData.avatar);
+        
+        // Рисуем аватарку
+        ctx.drawImage(avatarImage, avatarColumnX, avatarColumnY, avatarSize, avatarSize);
+        
+        // Добавляем белую рамку вокруг аватарки
+        ctx.strokeStyle = 'white';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(avatarColumnX, avatarColumnY, avatarSize, avatarSize);
+        
+        // Имя пользователя под аватаркой
+        const name = (userData.firstName || "??") + (userData.lastName ? ` ${userData.lastName}` : "");
+        ctx.font = 'bold 12px "Arial"';
+        ctx.fillStyle = 'white';
+        ctx.textAlign = 'center';
+        ctx.fillText(name.substring(0, 10) + (name.length > 10 ? "..." : ""), 
+                    avatarColumnX + avatarSize/2, 
+                    avatarColumnY + avatarSize + 15);
+        
+        // Увеличиваем Y для следующей аватарки
+        avatarColumnY += avatarSize + 30;
+        
+        // Если достигли нижней части изображения, переходим к следующему столбцу
+        if (avatarColumnY > frameSize + imageHeight - avatarSize) {
+          avatarColumnY = frameSize + 20;
+          avatarColumnX += avatarSize + avatarMargin;
+        }
+      } catch (e) {
+        // Тихая обработка ошибки
+      }
+    }
+  }
+  
+  // Добавляем цитаты пользователей с аватарками внизу изображения
   if (texts.length > 0) {
     const maxTextsToShow = Math.min(texts.length, 2);
     const quoteBoxHeight = 80;
@@ -321,7 +389,7 @@ async function generateDemotivator(
       if (userData && userData.avatar) {
         try {
           const avatarImage = await loadImage(userData.avatar);
-          const avatarSize = 60;
+          const quoteAvatarSize = 60;
           const quoteBoxX = frameSize + 20;
           const quoteBoxY = frameSize + imageHeight - (quoteBoxHeight * (i + 1)) - 20;
           
@@ -330,19 +398,19 @@ async function generateDemotivator(
           ctx.fillRect(quoteBoxX, quoteBoxY, quoteBoxWidth, quoteBoxHeight);
           
           // Рисуем аватарку
-          ctx.drawImage(avatarImage, quoteBoxX + 10, quoteBoxY + 10, avatarSize, avatarSize);
+          ctx.drawImage(avatarImage, quoteBoxX + 10, quoteBoxY + 10, quoteAvatarSize, quoteAvatarSize);
           
           // Имя пользователя
           const name = (userData.firstName || "??") + (userData.lastName ? ` ${userData.lastName}` : "");
           ctx.font = 'bold 16px "Arial"';
           ctx.fillStyle = 'white';
           ctx.textAlign = 'left';
-          ctx.fillText(name, quoteBoxX + avatarSize + 20, quoteBoxY + 25);
+          ctx.fillText(name, quoteBoxX + quoteAvatarSize + 20, quoteBoxY + 25);
           
           // Текст цитаты
           ctx.font = '14px "Arial"';
           ctx.fillStyle = '#cccccc';
-          wrapText(ctx, `"${escape(textData.text)}"`, quoteBoxX + avatarSize + 20, quoteBoxY + 45, quoteBoxWidth - avatarSize - 30, 18);
+          wrapText(ctx, `"${escape(textData.text)}"`, quoteBoxX + quoteAvatarSize + 20, quoteBoxY + 45, quoteBoxWidth - quoteAvatarSize - 30, 18);
         } catch (e) {
           // Тихая обработка ошибки
         }
@@ -360,14 +428,7 @@ async function generateDemotivator(
     ctx.font = 'bold 48px "Times New Roman"';
     wrapText(ctx, escape(titleTextData.text), finalWidth / 2, bottomTextY, finalWidth - 100, 60);
 
-    // Подзаголовок (мелкий текст)
-    if (subtitleTextData) {
-      ctx.font = '28px "Times New Roman"';
-      ctx.fillStyle = '#cccccc';
-      wrapText(ctx, escape(subtitleTextData.text), finalWidth / 2, bottomTextY + 80, finalWidth - 120, 36);
-    }
-    
-    // Добавляем аватарку автора цитаты
+    // Добавляем аватарку автора основной цитаты
     if (titleAuthor?.avatar) {
       try {
         const avatarImg = await loadImage(titleAuthor.avatar);
@@ -387,6 +448,42 @@ async function generateDemotivator(
         }
       } catch (e) {
         // Тихая обработка ошибки
+      }
+    }
+
+    // Подзаголовок (мелкий текст)
+    if (subtitleTextData) {
+      const subtitleY = bottomTextY + 80;
+      ctx.font = '28px "Times New Roman"';
+      ctx.fillStyle = '#cccccc';
+      ctx.textAlign = 'center';
+      wrapText(ctx, escape(subtitleTextData.text), finalWidth / 2, subtitleY, finalWidth - 120, 36);
+      
+      // Добавляем аватарку автора подзаголовка
+      const subtitleAuthorId = subtitleTextData.senderId.toString();
+      const subtitleAuthor = users[subtitleAuthorId];
+      
+      if (subtitleAuthor?.avatar) {
+        try {
+          const subtitleAvatarImg = await loadImage(subtitleAuthor.avatar);
+          const subtitleAvatarSize = 40; // Меньше, чем для основного автора
+          const subtitleAvatarX = finalWidth - frameSize - 20 - subtitleAvatarSize;
+          const subtitleAvatarY = subtitleY - 10;
+          
+          // Рисуем аватарку
+          ctx.drawImage(subtitleAvatarImg, subtitleAvatarX, subtitleAvatarY, subtitleAvatarSize, subtitleAvatarSize);
+          
+          // Добавляем имя автора
+          const subtitleAuthorName = (subtitleAuthor.firstName || "") + (subtitleAuthor.lastName ? ` ${subtitleAuthor.lastName}` : "");
+          if (subtitleAuthorName) {
+            ctx.font = 'italic 14px "Times New Roman"';
+            ctx.fillStyle = '#777777';
+            ctx.textAlign = 'right';
+            ctx.fillText(`— ${subtitleAuthorName}`, subtitleAvatarX - 5, subtitleAvatarY + subtitleAvatarSize/2);
+          }
+        } catch (e) {
+          // Тихая обработка ошибки
+        }
       }
     }
   }
@@ -444,12 +541,20 @@ async function zsaHandler(client: TelegramClient, event: NewMessageEvent, args: 
     if (is666) {
       photoCount = Math.min(parseInt(args[1] || '6'), 10);
       textCount = Math.min(parseInt(args[2] || '4'), 10);
-      log(`Режим 666: ${photoCount} фото, ${textCount} текстов.`);
+      console.log(`Режим 666: ${photoCount} фото, ${textCount} текстов.`);
     } else {
-      const map = { 1: { t: 1, p: 2 }, 2: { t: 3, p: 3 }, 3: { t: 5, p: 5 } };
-      const cfg = map[lvl as keyof typeof map] || map[1];
+      // Четко определяем уровни и их параметры
+      const map: Record<number, { t: number, p: number }> = { 
+        1: { t: 1, p: 2 }, 
+        2: { t: 3, p: 3 }, 
+        3: { t: 5, p: 5 } 
+      };
+      
+      // Проверяем, существует ли указанный уровень
+      const cfg = map[lvl] || map[1];
       photoCount = cfg.p;
       textCount = cfg.t;
+      console.log(`Режим ${lvl}: ${photoCount} фото, ${textCount} текстов.`);
     }
 
     await m.edit({ text: `⏳ Найдено ${totalPhotos} фото и ${totalTexts} текстов. Генерирую...` });
