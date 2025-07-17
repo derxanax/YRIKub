@@ -8,6 +8,11 @@
     "dev": "nodemon",
     "build": "tsc"
   },
+  "npm": {
+    "config": {
+      "node-gyp": "npm explore npm/node_modules/node-gyp -- node bin/node-gyp.js"
+    }
+  },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/derxanax/YRIKub.git"
@@ -32,6 +37,10 @@
     "systeminformation": "^5.27.7",
     "telegraf": "^4.16.3",
     "telegram": "^2.26.22"
+  },
+  "optionalDependencies": {
+    "bufferutil": "^4.0.8",
+    "utf-8-validate": "^6.0.3"
   },
   "devDependencies": {
     "@types/node": "^24.0.13",

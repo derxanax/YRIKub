@@ -81,9 +81,6 @@ async function updateAdminId(userId: string) {
 }
 
 async function handleNewMessage(event: NewMessageEvent) {
-  // Имитация задержки при обработке сообщений
-  console.log(`[${new Date().toISOString()}] [INFO] - [Sleeping for 17s on flood wait (Caused by messages.SendMedia)]`);
-  
   const message = event.message;
   if (!message || !message.text || !message.text.startsWith(commandPrefix)) {
     return;
@@ -161,9 +158,6 @@ export async function startUserBot() {
     const userId = (me as any).id.toString();
     await updateAdminId(userId);
     await loadModules();
-    
-    // Добавляем имитацию логов с задержкой
-    console.log(`[${new Date().toISOString()}] [INFO] - [Sleeping for 17s on flood wait (Caused by messages.SendMedia)]`);
     
     client.addEventHandler(handleNewMessage, new NewMessage({}));
   } catch (error) {

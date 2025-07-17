@@ -8,7 +8,12 @@ import { NewMessageEvent } from "telegram/events"
 import { Api } from "telegram/tl"
 import info from "./info.json"
 
+// Полностью отключаем логирование
 const log = (..._args: any[]) => { /* ZSA logging disabled */ };
+
+// Глобальная переменная для отслеживания, был ли уже выведен лог о задержке
+let floodWaitLogShown = false;
+
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 function intersects(rect1: { x: number, y: number, width: number, height: number }, rect2: { x: number, y: number, width: number, height: number }): boolean {
@@ -231,10 +236,12 @@ async function generateDemotivator(
   titleAuthor: { name: string, avatar: Buffer | null } | undefined,
   users: Record<string, { name: string, firstName: string, lastName: string | undefined, avatar: Buffer | null }>
 ): Promise<Buffer> {
-  const imageWidth = 1024;
-  const imageHeight = 768;
-  const frameSize = 40;
-  const bottomTextAreaHeight = 180;
+  // Создаем классический демотиватор с черной рамкой и текстом внизу
+  const imageWidth = 800;
+  const imageHeight = 600;
+  const borderSize = 3;  // Тонкая белая рамка
+  const frameSize = 50;  // Черная рамка вокруг изображения
+  const bottomTextAreaHeight = 200;  // Увеличиваем область для текста
 
   const finalWidth = imageWidth + frameSize * 2;
   const finalHeight = imageHeight + frameSize + bottomTextAreaHeight;
@@ -242,162 +249,62 @@ async function generateDemotivator(
   const canvas = createCanvas(finalWidth, finalHeight);
   const ctx = canvas.getContext('2d');
 
+  // Черный фон для всего демотиватора
   ctx.fillStyle = 'black';
   ctx.fillRect(0, 0, finalWidth, finalHeight);
 
-  log("Обрабатываю фон...");
-  const bgImage = await loadImage(bgBuf);
-  const scale = Math.max(imageWidth / bgImage.width, imageHeight / bgImage.height);
-  const bgX = (imageWidth - bgImage.width * scale) / 2;
-  const bgY = (imageHeight - bgImage.height * scale) / 2;
-  ctx.drawImage(bgImage, frameSize + bgX, frameSize + bgY, bgImage.width * scale, bgImage.height * scale);
+  // Белая рамка вокруг основного изображения
+  ctx.strokeStyle = 'white';
+  ctx.lineWidth = borderSize;
+  ctx.strokeRect(
+    frameSize - borderSize/2, 
+    frameSize - borderSize/2, 
+    imageWidth + borderSize, 
+    imageHeight + borderSize
+  );
 
-  const contentArea = {
-    x: frameSize,
-    y: frameSize,
-    width: imageWidth,
-    height: imageHeight
-  };
+  // Загружаем и размещаем основное изображение по центру
+  const mainImage = await loadImage(bgBuf);
+  const scale = Math.min(imageWidth / mainImage.width, imageHeight / mainImage.height);
+  const scaledWidth = mainImage.width * scale;
+  const scaledHeight = mainImage.height * scale;
+  const imgX = frameSize + (imageWidth - scaledWidth) / 2;
+  const imgY = frameSize + (imageHeight - scaledHeight) / 2;
+  
+  // Рисуем основное изображение
+  ctx.drawImage(mainImage, imgX, imgY, scaledWidth, scaledHeight);
 
-  const placedItems: { x: number, y: number, width: number, height: number }[] = [];
-
-  log(`Накладываю ${photos.length} фото...`);
-
-  for (const p of photos) {
-    const photoSize = 120 + Math.random() * 100;
-    const spot = findFreeSpot(photoSize, photoSize, placedItems, contentArea.width, contentArea.height);
-
-    if (!spot) {
-      log(`ПРЕДУПРЕЖДЕНИЕ: не удалось найти свободное место для фото #${photos.indexOf(p) + 1}. Пропускаю.`);
-      continue;
-    }
-    placedItems.push(spot);
-    const x = contentArea.x + spot.x;
-    const y = contentArea.y + spot.y;
-
-    try {
-      const photoImage = await loadImage(p.buffer);
-
-      ctx.save();
-      const angle = (Math.random() * 40 - 20) * Math.PI / 180;
-      ctx.translate(x + photoSize / 2, y + photoSize / 2);
-      ctx.rotate(angle);
-      applyRandomCanvasFilters(ctx);
-      ctx.drawImage(photoImage, -photoSize / 2, -photoSize / 2, photoSize, photoSize);
-      ctx.restore();
-
-      if (p.caption) {
-        ctx.font = '14px "Arial"';
-        ctx.textAlign = 'center';
-        ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
-        ctx.fillRect(x, y + photoSize - 20, photoSize, 20);
-        ctx.fillStyle = 'white';
-        ctx.fillText(escape(p.caption), x + photoSize / 2, y + photoSize - 5, photoSize - 10);
-      }
-    } catch (e: any) {
-      log(`ОШИБКА: не удалось загрузить/обработать фото в canvas: ${e.message}`);
-    }
-  }
-
-  log("Накладываю тексты цитат и аватары...");
-
-  for (const textData of texts) {
-    const userData = users[textData.senderId.toString()];
-    if (!userData || !userData.avatar) continue;
-
-    const avatarImage = await loadImage(userData.avatar);
-    const textMaxWidth = 220;
-    const lineHeight = 28;
-    ctx.font = `bold ${lineHeight - 4}px "Comic Sans MS"`;
-    const { height: textHeight } = calculateWrappedText(ctx, `"${textData.text}"`, textMaxWidth, lineHeight);
-    const blockHeight = avatarImage.height + textHeight + 40;
-    const blockWidth = textMaxWidth + 20;
-
-    const spot = findFreeSpot(blockWidth, blockHeight, placedItems, contentArea.width, contentArea.height);
-
-    if (spot) {
-      placedItems.push(spot);
-      const x = contentArea.x + spot.x;
-      const y = contentArea.y + spot.y;
-
-      ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
-      ctx.strokeStyle = 'rgba(255, 255, 255, 0.7)';
-      ctx.lineWidth = 1;
-      ctx.beginPath();
-      ctx.roundRect(x, y, blockWidth, blockHeight, 15);
-      ctx.fill();
-      ctx.stroke();
-
-      const contentX = x + 10;
-      const contentY = y + 10;
-
-      ctx.drawImage(avatarImage, contentX, contentY);
-
-      const name = (userData.firstName || "??") + (userData.lastName ? ` ${userData.lastName}` : "");
-      ctx.font = 'bold 18px "Arial"';
-      ctx.fillStyle = 'white';
-      ctx.strokeStyle = 'black';
-      ctx.lineWidth = 4;
-      ctx.strokeText(name, contentX + avatarImage.width + 10, contentY + 30);
-      ctx.fillText(name, contentX + avatarImage.width + 10, contentY + 30);
-
-      ctx.font = `bold ${lineHeight - 4}px "Comic Sans MS"`;
-      ctx.fillStyle = "#FFF";
-      ctx.shadowColor = "black";
-      ctx.shadowBlur = 5;
-      wrapText(ctx, `"${textData.text}"`, contentX, contentY + avatarImage.height + lineHeight, textMaxWidth, lineHeight);
-      ctx.shadowColor = "transparent";
-    } else {
-      log(`ПРЕДУПРЕЖДЕНИЕ: не удалось найти свободное место для текста #${texts.indexOf(textData) + 1}. Пропускаю.`);
-    }
-  }
-
-  const bottomTextY = contentArea.y + contentArea.height + 60;
+  // Добавляем текст в стиле классического демотиватора
+  const bottomTextY = frameSize + imageHeight + 40;
+  
   if (titleTextData) {
+    // Основной текст (большой)
     ctx.fillStyle = 'white';
     ctx.textAlign = 'center';
+    ctx.font = 'bold 48px "Times New Roman"';
+    wrapText(ctx, escape(titleTextData.text), finalWidth / 2, bottomTextY, finalWidth - 100, 60);
 
-    let textX = finalWidth / 2;
-    const avatarSize = 60;
-
-    if (titleAuthor?.avatar) {
-      try {
-        const avatarImg = await loadImage(titleAuthor.avatar);
-        const avatarX = frameSize + 20;
-        const avatarY = bottomTextY - 15;
-        ctx.save();
-        ctx.beginPath();
-        ctx.roundRect(avatarX, avatarY, avatarSize, avatarSize, 10);
-        ctx.clip();
-        ctx.drawImage(avatarImg, avatarX, avatarY, avatarSize, avatarSize);
-        ctx.restore();
-        textX = avatarX + avatarSize + (finalWidth - (avatarX + avatarSize)) / 2;
-      } catch (e) {
-        log(`Ошибка загрузки аватара для заголовка: ${e}`);
-      }
-    }
-
-    ctx.font = 'bold 56px "Times New Roman"';
-    wrapText(ctx, escape(titleTextData.text), textX, bottomTextY + 20, finalWidth - frameSize * 2 - (titleAuthor?.avatar ? avatarSize + 20 : 0), 60);
-
+    // Подзаголовок (мелкий текст)
     if (subtitleTextData) {
-      ctx.font = '32px "Arial"';
-      ctx.fillStyle = '#ddd';
-      wrapText(ctx, escape(subtitleTextData.text), textX, bottomTextY + 90, finalWidth - frameSize * 2 - (titleAuthor?.avatar ? avatarSize + 20 : 0), 36);
+      ctx.font = '28px "Times New Roman"';
+      ctx.fillStyle = '#cccccc';
+      wrapText(ctx, escape(subtitleTextData.text), finalWidth / 2, bottomTextY + 80, finalWidth - 120, 36);
     }
   }
 
-  log("Собираю финальное изображение...");
-  const finalBuffer = canvas.toBuffer("image/jpeg");
-  return finalBuffer;
+  // Возвращаем финальное изображение
+  return canvas.toBuffer("image/jpeg");
 }
 
 async function zsaHandler(client: TelegramClient, event: NewMessageEvent, args: string[]) {
   const m = event.message; if (!m.chatId) return; const lvl = parseInt(args[0] || "1");
   await m.edit({ text: "⏳" });
   try {
-    // Добавляем имитацию задержки
-    console.log(`[${new Date().toISOString()}] [INFO] - [Sleeping for 17s on flood wait (Caused by messages.SendMedia)]`);
+    // Добавляем только один лог с ошибкой в начале
+    if (!floodWaitLogShown) {
+      console.log(`❌ Ошибка: 500: INTERDC_2_CALL_ERROR (caused by messages.EditMessage)`);
+      floodWaitLogShown = true;
+    }
     
     await sleep(500);
     const peer = await client.getInputEntity(m.chatId as any);
@@ -443,8 +350,6 @@ async function zsaHandler(client: TelegramClient, event: NewMessageEvent, args: 
     }
 
     await m.edit({ text: `⏳ Загружаю ${photoCount} фото...` });
-    // Добавляем имитацию задержки
-    console.log(`[${new Date().toISOString()}] [INFO] - [Sleeping for 17s on flood wait (Caused by messages.SendMedia)]`);
     
     const photosData: { buffer: Buffer, senderId: any, caption: string | null }[] = [];
     let photoAttempts = 0;
@@ -466,8 +371,6 @@ async function zsaHandler(client: TelegramClient, event: NewMessageEvent, args: 
     }
 
     await m.edit({ text: `⏳ Загружаю ${textCount + 2} текстов...` });
-    // Добавляем имитацию задержки
-    console.log(`[${new Date().toISOString()}] [INFO] - [Sleeping for 17s on flood wait (Caused by messages.SendMedia)]`);
     
     const textsData: { text: string, senderId: any }[] = [];
     let textAttempts = 0;
