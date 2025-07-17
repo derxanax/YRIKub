@@ -78,15 +78,15 @@ src/
 ## 🚀 Установка
 
 1. **Клонирование репозитория:**
-   ```bash
-   git clone https://github.com/derxanax/YRIKub.git
-   cd YRIKub
-   ```
+    ```bash
+    git clone https://github.com/derxanax/YRIKub.git
+    cd YRIKub
+    ```
 
 2. **Установка зависимостей:**
-   ```bash
-   npm install
-   ```
+    ```bash
+    npm install
+    ```
 
 ## 🔧 Настройка
 
@@ -106,15 +106,15 @@ src/
 
 ### Режим разработки
 Запуск с автоматическим перезапуском при изменении файлов:
-```bash
-npm run dev
-```
+    ```bash
+    npm run dev
+    ```
 
 ### Сборка и запуск в продакшн
-```bash
-npm run build
-node dist/main.js
-```
+    ```bash
+    npm run build
+    node dist/main.js
+    ```
 
 ## 📝 Команды
 

@@ -19,7 +19,7 @@ export async function startBotPlaceholder(): Promise<void> {
 
   try {
     await bot.launch();
-    console.log('Бот запущен');
+    /* Bot launched - log removed to reduce noise */
   } catch (error) {
     console.error('Ошибка запуска бота:', error);
     throw error;

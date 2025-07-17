@@ -8,12 +8,11 @@ async function main() {
   try {
     const logoPath = path.join(process.cwd(), 'assets', 'txt', 'logo-sex.ascii');
     const logo = await fs.readFile(logoPath, 'utf-8');
-    console.log(chalk.magentaBright(logo));
+    // banner output disabled to reduce log noise
   } catch (error) {
   }
 
   try {
-    // Запускаем боты последовательно, а не параллельно
     await startUserBot();
     await startBotPlaceholder();
   } catch (error) {

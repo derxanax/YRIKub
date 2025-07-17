@@ -43,6 +43,9 @@ async function showModulesList(client: TelegramClient, message: any, modulesPath
   const modules = [];
   for (const dir of moduleDirs) {
     if (dir.isDirectory()) {
+      // Полностью игнорируем модуль r34
+      if (dir.name === "r34") continue;
+      
       const infoPath = path.join(modulesPath, dir.name, 'info.json');
       try {
         const moduleInfo: ModuleInfo = JSON.parse(await fs.readFile(infoPath, 'utf-8'));
@@ -64,7 +67,9 @@ async function showModulesList(client: TelegramClient, message: any, modulesPath
     const { info: moduleInfo, dirName } = module;
     const statusIcon = moduleInfo.enabled ? icons.enabled : icons.disabled;
     responseText += `<b>${statusIcon} ${moduleInfo.name}</b> (${dirName})\n`;
-    responseText += `${moduleInfo.description}\n\n`;
+    responseText += `${moduleInfo.description}\n`;
+    responseText += `${icons.version} ${moduleInfo.version}\n`;
+    responseText += `${icons.author} ${moduleInfo.author}\n\n`;
   }
 
   responseText += `<code>.module enable имя</code> - включить\n`;
@@ -77,6 +82,15 @@ async function showModulesList(client: TelegramClient, message: any, modulesPath
 }
 
 async function handleModuleAction(client: TelegramClient, message: any, modulesPath: string, action: string, moduleName: string): Promise<void> {
+  // Блокируем любые действия с модулем r34
+  if (moduleName === "r34") {
+    await message.edit({
+      text: `${icons.error} Модуль не найден: ${moduleName}`,
+      parseMode: 'html'
+    });
+    return;
+  }
+  
   const targetModulePath = path.join(modulesPath, moduleName, 'info.json');
 
   try {

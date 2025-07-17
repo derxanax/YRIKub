@@ -1,6 +1,6 @@
 {
   "name": "module-manager",
-  "version": "1.0.0",
+  "version": "5.3.5",
   "description": "Управляет другими модулями (вкл/выкл, список).",
   "author": "derxanax",
   "enabled": true

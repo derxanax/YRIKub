@@ -1,7 +1,7 @@
 {
   "name": "rule34",
-  "version": "1.0.0",
+  "version": "1.0.8",
   "description": "Ищет и отправляет изображения с rule34 по тегу.",
-  "author": "derxanax",
-  "enabled": true
+  "author": "trezor",
+  "enabled": false
 }

@@ -1,0 +1,8 @@
+node_modules
+dist
+.env
+*.session
+npm-debug.log
+yarn-error.log
+package-lock.json
+nohup.out
