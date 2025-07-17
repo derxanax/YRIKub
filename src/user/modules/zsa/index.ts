@@ -271,33 +271,9 @@ async function generateDemotivator(
   const imgX = frameSize + (imageWidth - scaledWidth) / 2;
   const imgY = frameSize + (imageHeight - scaledHeight) / 2;
   
-  // Рисуем основное изображение с эффектом
-  ctx.save();
-  
-  // Случайный эффект для основного изображения
-  const mainImageEffect = Math.floor(Math.random() * 5);
-  switch (mainImageEffect) {
-    case 0: // Нормальное изображение
-      ctx.drawImage(mainImage, imgX, imgY, scaledWidth, scaledHeight);
-      break;
-    case 1: // Черно-белое
-      ctx.filter = 'grayscale(100%)';
-      ctx.drawImage(mainImage, imgX, imgY, scaledWidth, scaledHeight);
-      break;
-    case 2: // Сепия
-      ctx.filter = 'sepia(80%)';
-      ctx.drawImage(mainImage, imgX, imgY, scaledWidth, scaledHeight);
-      break;
-    case 3: // Инвертированное
-      ctx.filter = 'invert(100%)';
-      ctx.drawImage(mainImage, imgX, imgY, scaledWidth, scaledHeight);
-      break;
-    case 4: // Размытое
-      ctx.filter = 'blur(3px)';
-      ctx.drawImage(mainImage, imgX, imgY, scaledWidth, scaledHeight);
-      break;
-  }
-  ctx.restore();
+  // Рисуем основное изображение
+  // Просто рисуем изображение без эффектов, так как CSS-фильтры не поддерживаются в типах TS
+  ctx.drawImage(mainImage, imgX, imgY, scaledWidth, scaledHeight);
 
   // Добавляем случайные фотографии пользователей поверх основного изображения
   if (photos.length > 0) {
@@ -323,21 +299,8 @@ async function generateDemotivator(
         ctx.translate(photoX + photoSize/2, photoY + photoSize/2);
         ctx.rotate(angle);
         
-        // Случайный эффект для фото
-        const photoEffect = Math.floor(Math.random() * 3);
-        switch (photoEffect) {
-          case 0: // Нормальное
-            ctx.drawImage(photoImage, -photoSize/2, -photoSize/2, photoSize, photoSize);
-            break;
-          case 1: // Черно-белое
-            ctx.filter = 'grayscale(100%)';
-            ctx.drawImage(photoImage, -photoSize/2, -photoSize/2, photoSize, photoSize);
-            break;
-          case 2: // Сепия
-            ctx.filter = 'sepia(80%)';
-            ctx.drawImage(photoImage, -photoSize/2, -photoSize/2, photoSize, photoSize);
-            break;
-        }
+        // Просто рисуем фото без эффектов, так как CSS-фильтры не поддерживаются в типах TS
+        ctx.drawImage(photoImage, -photoSize/2, -photoSize/2, photoSize, photoSize);
         ctx.restore();
       } catch (e) {
         // Тихая обработка ошибки
